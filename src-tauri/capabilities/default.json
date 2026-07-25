@@ -1,0 +1,18 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Permissions needed by the Nib Color Picker main window.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-hide",
+    "core:window:allow-show",
+    "core:window:allow-set-focus",
+    "core:window:allow-set-always-on-top",
+    "store:default",
+    "clipboard-manager:allow-write-text",
+    "notification:default",
+    "autostart:default",
+    "global-shortcut:default"
+  ]
+}
