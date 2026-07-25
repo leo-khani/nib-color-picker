@@ -1,0 +1,5 @@
+dist
+coverage
+src-tauri/target
+package-lock.json
+*.svg
