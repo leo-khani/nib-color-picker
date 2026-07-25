@@ -1,0 +1,45 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: npm ci
+      - run: npm run validate
+      - run: cargo test --manifest-path src-tauri/Cargo.toml
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: Nib Color Picker ${{ github.ref_name }}
+          releaseBody: See CHANGELOG.md for release notes.
+          releaseDraft: true
+          prerelease: false
+      - name: Create checksums
+        shell: pwsh
+        run: |
+          Get-ChildItem src-tauri/target/release/bundle -Recurse -File |
+            Where-Object Extension -in '.msi', '.exe' |
+            ForEach-Object { Get-FileHash $_.FullName -Algorithm SHA256 } |
+            Format-Table -AutoSize | Out-File checksums.txt
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: checksums.txt
+          draft: true
