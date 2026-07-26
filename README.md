@@ -14,6 +14,10 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-9B92FF" alt="MIT License"></a>
 </p>
 
+<p align="center">
+  <img src="public/images/cover-01.png" alt="Nib Color Picker running on Windows" width="100%">
+</p>
+
 Nib Color Picker samples a color anywhere on the Windows desktop, copies it in the
 format you need, and keeps a private local history. It is designed as a focused
 desktop utility: always available, quick to open, and quiet when it is not being used.
@@ -26,6 +30,28 @@ analytics or telemetry.
 > Nib is currently in preview. Version `0.1.0` is intended for early adopters and
 > contributors. Windows may show a SmartScreen warning until release binaries are
 > code-signed.
+
+## Interface
+
+<table>
+  <tr>
+    <td colspan="2">
+      <img src="public/images/cover-02.png" alt="Nib Color Picker history interface">
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <img src="public/images/screenshot-01.png" alt="Nib Color Picker main picker screen">
+    </td>
+    <td width="50%">
+      <img src="public/images/screenshot-02.png" alt="Nib Color Picker color history screen">
+    </td>
+  </tr>
+  <tr>
+    <td align="center"><strong>Picker and color formats</strong></td>
+    <td align="center"><strong>History and favorites</strong></td>
+  </tr>
+</table>
 
 ## Highlights
 
