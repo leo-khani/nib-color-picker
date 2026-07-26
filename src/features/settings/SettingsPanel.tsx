@@ -96,13 +96,7 @@ export default function SettingsPanel({
               setDraft({ ...draft, general: { ...draft.general, closeToTray: value } })
             }
           />
-          <Toggle
-            label="Always on top"
-            checked={draft.general.alwaysOnTop}
-            onChange={(value) =>
-              setDraft({ ...draft, general: { ...draft.general, alwaysOnTop: value } })
-            }
-          />
+          <Toggle label="Always on top" checked disabled onChange={() => undefined} />
           <Toggle
             label="Show notifications"
             checked={draft.general.showNotifications}
@@ -293,10 +287,12 @@ function Toggle({
   label,
   checked,
   onChange,
+  disabled = false,
 }: {
   label: string;
   checked: boolean;
   onChange: (value: boolean) => void;
+  disabled?: boolean;
 }) {
   return (
     <label className="flex cursor-pointer items-center justify-between gap-4 text-sm">
@@ -304,8 +300,9 @@ function Toggle({
       <input
         type="checkbox"
         checked={checked}
+        disabled={disabled}
         onChange={(event) => onChange(event.target.checked)}
-        className="size-4 accent-blue-600"
+        className="size-4 accent-blue-600 disabled:cursor-not-allowed disabled:opacity-70"
       />
     </label>
   );
