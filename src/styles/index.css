@@ -1,22 +1,60 @@
 @import "tailwindcss";
+@import "@fontsource/jetbrains-mono/latin-400.css";
+
+@font-face {
+  font-family: "Geom";
+  src: url("../assets/fonts/CMGeom-Regular.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
 
 @theme {
-  --color-accent: #2563eb;
-  --color-accent-hover: #1d4ed8;
-  --font-sans: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  --color-white: #f9fafb;
+  --color-black: #131315;
+  --color-nib-white: #f9fafb;
+  --color-nib-black: #131315;
+  --color-nib-blue: #335ac7;
+  --color-nib-cerulean: #44a7ec;
+  --color-accent: #335ac7;
+  --color-accent-hover: #44a7ec;
+  --color-zinc-50: #f9fafb;
+  --color-zinc-100: #f1f3f6;
+  --color-zinc-200: #e6e9ef;
+  --color-zinc-300: #cdd3dd;
+  --color-zinc-400: #9aa3b2;
+  --color-zinc-500: #667085;
+  --color-zinc-600: #4b5565;
+  --color-zinc-700: #343842;
+  --color-zinc-800: #222226;
+  --color-zinc-900: #1a1a1d;
+  --color-zinc-950: #131315;
+  --color-blue-50: #eff6ff;
+  --color-blue-100: #ddecff;
+  --color-blue-200: #badcf8;
+  --color-blue-300: #7fc2f2;
+  --color-blue-400: #62b5ef;
+  --color-blue-500: #44a7ec;
+  --color-blue-600: #335ac7;
+  --color-blue-700: #2949a5;
+  --color-blue-800: #223c85;
+  --color-blue-900: #1d326b;
+  --color-blue-950: #172650;
+  --font-sans: "Geom", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Mono", "Consolas", monospace;
 }
 
 :root {
   font-family: var(--font-sans);
-  color: #18181b;
-  background: #f4f4f5;
+  color: #131315;
+  background: #f9fafb;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
 
 :root.dark {
-  color: #f4f4f5;
-  background: #18181b;
+  color: #f9fafb;
+  background: #131315;
   color-scheme: dark;
 }
 
@@ -43,8 +81,55 @@ button,
 }
 
 :focus-visible {
-  outline: 2px solid #2563eb;
+  outline: 2px solid #44a7ec;
   outline-offset: 2px;
+}
+
+.grainient-container {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.spinner {
+  position: relative;
+  width: 3em;
+  height: 3em;
+  cursor: not-allowed;
+  border: 2px solid #335ac7;
+  border-radius: 50%;
+  box-shadow:
+    -10px -10px 10px #335ac7,
+    0 -10px 10px 0 #44a7ec,
+    10px -10px 10px #335ac7,
+    10px 0 10px #44a7ec,
+    10px 10px 10px 0 #335ac7,
+    0 10px 10px 0 #44a7ec,
+    -10px 10px 10px 0 #335ac7;
+  animation: loading-pulse 1.2s ease-in-out infinite alternate;
+}
+
+.spinnerin {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 1.5em;
+  height: 1.5em;
+  border: 2px solid #44a7ec;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+
+@keyframes loading-pulse {
+  from {
+    opacity: 0.65;
+    transform: scale(0.94);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1.04);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -55,5 +140,67 @@ button,
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+.glass-panel {
+  @apply relative bg-black/30 backdrop-blur-xl;
+}
+
+.glass-panel::before {
+  content: "";
+  border-radius: inherit;
+  corner-shape: inherit;
+  @apply pointer-events-none absolute inset-0 opacity-40;
+  background:
+    linear-gradient(135deg, rgb(255 255 255 / 72%), transparent 45%),
+    radial-gradient(circle at 30% 20%, rgb(255 255 255 / 80%), transparent 35%);
+}
+
+@utility rounded-ios-xs {
+  border-radius: 0.55rem;
+  corner-shape: squircle;
+}
+
+@utility rounded-ios-sm {
+  border-radius: 0.75rem;
+  corner-shape: squircle;
+}
+
+@utility rounded-ios {
+  border-radius: 1rem;
+  corner-shape: squircle;
+}
+
+@utility rounded-ios-lg {
+  border-radius: 1.5rem;
+  corner-shape: squircle;
+}
+
+@utility rounded-ios-xl {
+  border-radius: 2rem;
+  corner-shape: squircle;
+}
+
+@utility rounded-ios-2xl {
+  border-radius: 2.5rem;
+  corner-shape: squircle;
+}
+
+@utility rounded-ios-3xl {
+  border-radius: 3rem;
+  corner-shape: squircle;
+}
+
+@utility rounded-ios-4xl {
+  border-radius: 4rem;
+  corner-shape: squircle;
+}
+
+@utility rounded-ios-xl {
+  border-radius: 2rem;
+
+  @supports (corner-shape: squircle) {
+    corner-shape: squircle;
   }
 }

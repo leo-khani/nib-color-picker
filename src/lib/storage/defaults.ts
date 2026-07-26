@@ -39,7 +39,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     addGeneratedColors: true,
   },
   appearance: {
-    theme: "system",
+    theme: "dark",
     compact: false,
     reducedMotion: "system",
     animationIntensity: 0.5,

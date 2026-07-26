@@ -1,6 +1,9 @@
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+"use client";
 
-interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+import { motion, type HTMLMotionProps } from "motion/react";
+import type { ReactNode } from "react";
+
+interface IconButtonProps extends HTMLMotionProps<"button"> {
   label: string;
   children: ReactNode;
   active?: boolean;
@@ -14,18 +17,50 @@ export function IconButton({
   ...props
 }: IconButtonProps) {
   return (
-    <button
+    <motion.button
       type="button"
       aria-label={label}
       title={label}
-      className={`inline-flex size-9 items-center justify-center rounded-lg border transition-colors ${
+      initial={false}
+      animate={{
+        scale: active ? 1.04 : 1,
+      }}
+      whileHover={{
+        scale: 1.06,
+        y: -1,
+      }}
+      whileTap={{
+        scale: 0.92,
+        y: 1,
+      }}
+      transition={{
+        type: "spring",
+        stiffness: 420,
+        damping: 22,
+      }}
+      className={`inline-flex size-9 items-center justify-center rounded-ios-sm ${
         active
-          ? "border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
-          : "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+          ? "bg-blue-100 text-blue-700 shadow-sm dark:bg-blue-500/20 dark:text-blue-200"
+          : "bg-zinc-200 text-zinc-700 hover:bg-zinc-300 hover:text-zinc-950 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700 dark:hover:text-white"
       } ${className}`}
       {...props}
     >
-      {children}
-    </button>
+      <motion.span
+        className="inline-flex items-center justify-center"
+        animate={{
+          scale: active ? 1.08 : 1,
+        }}
+        whileHover={{
+          scale: 1.1,
+        }}
+        transition={{
+          type: "spring",
+          stiffness: 400,
+          damping: 18,
+        }}
+      >
+        {children}
+      </motion.span>
+    </motion.button>
   );
 }

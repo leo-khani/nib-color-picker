@@ -1,14 +1,17 @@
-import { lazy, Suspense, useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { Crosshair, Settings, Zap } from "lucide-react";
+import { Check, Copy, Crosshair } from "lucide-react";
+import { motion, useReducedMotion } from "motion/react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import AppHeaderBar, { type AppSection } from "../components/app-header-bar";
+import { Toast } from "../components/feedback/Toast";
+import { Grainient } from "../components/grainient";
 import { ColorDetails } from "../features/color-details/ColorDetails";
 import { ColorHarmonies } from "../features/color-harmonies/ColorHarmonies";
 import { HistoryList } from "../features/color-history/HistoryList";
-import { Toast } from "../components/feedback/Toast";
-import { IconButton } from "../components/ui/IconButton";
 import { useCopy } from "../hooks/use-copy";
+import { useFitWindow } from "../hooks/use-fit-window";
+import { formatColor, parseColor, toHex } from "../lib/color/color";
 import { isTauri, pickScreenColor } from "../lib/platform/native";
-import { formatColor } from "../lib/color/color";
 import { useAppStore } from "../stores/app-store";
 
 const SettingsPanel = lazy(() => import("../features/settings/SettingsPanel"));
@@ -19,41 +22,71 @@ export function App() {
     currentColor,
     history,
     settings,
-    search,
     favoritesOnly,
     hydrate,
     setColor,
     updateSettings,
+    toggleCurrentColorFavorite,
     toggleFavorite,
     deleteHistory,
     clearHistory,
     importHistory,
-    setSearch,
     setFavoritesOnly,
   } = useAppStore();
   const { copy, message } = useCopy();
+  const formats = useMemo(
+    () => formatColor(currentColor, settings.formatting),
+    [currentColor, settings.formatting],
+  );
+  const [activeSection, setActiveSection] = useState<AppSection>("picker");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [pickerError, setPickerError] = useState<string | null>(null);
   const [picking, setPicking] = useState(false);
+  const [inputDraft, setInputDraft] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const copiedTimer = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const prefersReducedMotion = useReducedMotion();
+  const compact = settings.appearance.compact;
+  const currentHistoryEntry = history.find((entry) => entry.hex === toHex(currentColor));
+
+  useFitWindow(contentRef, { compact, settingsOpen, enabled: hydrated });
 
   useEffect(() => {
     void hydrate();
   }, [hydrate]);
 
-  useEffect(() => {
-    const dark =
-      settings.appearance.theme === "dark" ||
-      (settings.appearance.theme === "system" &&
-        window.matchMedia("(prefers-color-scheme: dark)").matches);
-    document.documentElement.classList.toggle("dark", dark);
-  }, [settings.appearance.theme]);
+  useEffect(
+    () => () => {
+      if (copiedTimer.current !== null) {
+        window.clearTimeout(copiedTimer.current);
+      }
+    },
+    [],
+  );
 
-  const pick = async () => {
+  useEffect(() => {
+    document.documentElement.classList.add("dark");
+  }, []);
+
+  useEffect(() => {
+    if (!settingsOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [settingsOpen]);
+
+  const pick = useCallback(async () => {
     setPicking(true);
     setPickerError(null);
     try {
       const result = await pickScreenColor();
       setColor(result.color, "screen-picker");
+      setInputDraft(null);
+      setError(null);
       if (settings.picker.autoCopy) {
         const formats = formatColor(result.color, settings.formatting);
         await copy(formats[settings.formatting.preferredFormat], "Picked color copied");
@@ -64,7 +97,7 @@ export function App() {
     } finally {
       setPicking(false);
     }
-  };
+  }, [copy, setColor, settings.formatting, settings.picker.autoCopy]);
 
   useEffect(() => {
     if (!isTauri()) return;
@@ -74,87 +107,236 @@ export function App() {
       void unlistenPicker.then((unlisten) => unlisten());
       void unlistenSettings.then((unlisten) => unlisten());
     };
-  });
+  }, [pick]);
+
+  function handleCopy() {
+    void copy(formats[settings.formatting.preferredFormat], "Color copied");
+
+    setCopied(true);
+    if (copiedTimer.current !== null) {
+      window.clearTimeout(copiedTimer.current);
+    }
+    copiedTimer.current = window.setTimeout(() => {
+      setCopied(false);
+      copiedTimer.current = null;
+    }, 1500);
+  }
+
+  const submit = () => {
+    const parsed = parseColor(inputDraft ?? formats.hex);
+    if (!parsed) {
+      setError("Enter a valid HEX, RGB, RGBA, HSL, or HSLA color.");
+      return;
+    }
+    setError(null);
+    setColor(parsed, "manual-input");
+    setInputDraft(null);
+  };
 
   if (!hydrated) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-sm text-zinc-500">
-        Loading Nib Color Picker…
+      <div
+        className="relative isolate flex min-h-screen items-center justify-center overflow-hidden bg-nib-black"
+        role="status"
+        aria-label="Loading Nib Color Picker"
+      >
+        <Grainient
+          animate={!prefersReducedMotion}
+          className="pointer-events-none absolute inset-0 z-0"
+        />
+        <div className="spinner relative z-10" aria-hidden="true">
+          <div className="spinnerin" />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 text-zinc-950 dark:bg-zinc-950 dark:text-zinc-50">
-      <header className="sticky top-0 z-20 border-b border-zinc-200 bg-white/95 px-4 py-3 backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/95">
-        <div className="mx-auto flex max-w-xl items-center gap-3">
-          <div className="flex size-8 items-center justify-center rounded-lg bg-blue-600 text-white">
-            <Zap size={17} fill="currentColor" />
+    <div
+      ref={contentRef}
+      className="relative isolate flex flex-col overflow-hidden bg-nib-black text-zinc-50"
+    >
+      <Grainient
+        animate={!prefersReducedMotion}
+        className="pointer-events-none absolute inset-0 z-0"
+      />
+      {compact && !settingsOpen ? (
+        <>
+          <div className="relative z-20">
+            <AppHeaderBar
+              compact
+              activeSection={activeSection}
+              onSectionChange={setActiveSection}
+              onOpenSettings={() => setSettingsOpen(true)}
+            />
           </div>
-          <div className="min-w-0 flex-1">
-            <h1 className="truncate text-sm font-semibold">Nib Color Picker</h1>
-            <p className="truncate text-xs text-zinc-500">Fast, private, and always ready</p>
+          <main className="relative z-10 flex w-full items-center gap-2 p-2">
+            <div
+              className="size-11 shrink-0 rounded-ios-xl border border-white/15 shadow-sm"
+              style={{ backgroundColor: formats.css }}
+              role="img"
+              aria-label={`Current color ${formats[settings.formatting.preferredFormat]}`}
+              title="Current color"
+            />
+            <motion.button
+              type="button"
+              onClick={handleCopy}
+              whileTap={prefersReducedMotion ? {} : { scale: 0.97 }}
+              className="h-11 min-w-0 flex-1 truncate rounded-ios-xl bg-zinc-900/80 px-3 text-left font-mono text-sm uppercase"
+              aria-label="Copy current color"
+              title="Copy current color"
+            >
+              {formats[settings.formatting.preferredFormat]}
+            </motion.button>
+            <motion.button
+              type="button"
+              onClick={() => void pick()}
+              disabled={picking}
+              whileHover={prefersReducedMotion ? {} : { scale: 1.03 }}
+              whileTap={prefersReducedMotion ? {} : { scale: 0.96 }}
+              className="flex h-11 shrink-0 items-center gap-1.5 rounded-ios-xl bg-blue-500 px-3 text-sm font-semibold text-white shadow-sm shadow-blue-950/20 hover:bg-blue-400 disabled:opacity-60"
+            >
+              <Crosshair size={16} />
+              {picking ? "Picking…" : "Pick"}
+            </motion.button>
+          </main>
+        </>
+      ) : (
+        <>
+          <div className="sticky top-0 z-20">
+            <AppHeaderBar
+              activeSection={activeSection}
+              onSectionChange={setActiveSection}
+              onOpenSettings={() => setSettingsOpen(true)}
+            />
           </div>
-          <IconButton label="Open settings" onClick={() => setSettingsOpen(true)}>
-            <Settings size={17} />
-          </IconButton>
-        </div>
-      </header>
 
-      <main
-        className={`mx-auto max-w-xl ${settings.appearance.compact ? "space-y-4 p-3" : "space-y-6 p-4"}`}
-      >
-        <button
-          type="button"
-          onClick={() => void pick()}
-          disabled={picking}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:opacity-60"
-        >
-          <Crosshair size={19} />
-          {picking ? "Picking…" : "Pick color from screen"}
-          <kbd className="ml-auto rounded bg-white/15 px-2 py-0.5 text-xs font-normal">
-            {settings.picker.shortcut}
-          </kbd>
-        </button>
-        {pickerError && (
-          <p
-            role="alert"
-            className="rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950 dark:text-red-300"
-          >
-            {pickerError}
-          </p>
-        )}
+          <main className="relative z-10 mx-auto w-full max-w-sm flex-1 space-y-3 p-3">
+            {activeSection === "picker" ? (
+              <>
+                <div className="flex items-end gap-3">
+                  <motion.button
+                    type="button"
+                    onClick={() => void pick()}
+                    disabled={picking}
+                    whileHover={prefersReducedMotion ? {} : { scale: 1.03 }}
+                    whileTap={prefersReducedMotion ? {} : { scale: 0.96 }}
+                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                    className="flex h-9 shrink-0 items-center gap-2 rounded-ios-lg bg-blue-600 px-3 text-sm font-semibold text-white shadow-sm shadow-blue-950/20 hover:bg-blue-500 disabled:opacity-60 dark:bg-blue-500 dark:hover:bg-blue-400"
+                  >
+                    <Crosshair size={16} />
+                    {picking ? "Picking…" : "Pick"}
+                    <kbd className="rounded-ios-sm bg-white/15 px-1.5 py-0.5 font-mono text-[9px] font-normal tracking-tight">
+                      {settings.picker.shortcut}
+                    </kbd>
+                  </motion.button>
+                  <div className="min-w-0 flex-1">
+                    <div>
+                      <div className="flex gap-2">
+                        <input
+                          id="color-input"
+                          value={inputDraft ?? formats.hex}
+                          onChange={(event) => setInputDraft(event.target.value)}
+                          onBlur={submit}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") submit();
+                            if (event.key === "Escape") {
+                              setInputDraft(null);
+                              setError(null);
+                              event.currentTarget.blur();
+                            }
+                          }}
+                          aria-invalid={Boolean(error)}
+                          aria-describedby={error ? "color-input-error" : undefined}
+                          className="h-10 min-w-0 flex-1 rounded-ios-lg bg-zinc-200/70 px-3 font-mono text-sm uppercase text-zinc-950 outline-none placeholder:text-zinc-600 focus:bg-zinc-200 dark:bg-zinc-900 dark:text-white dark:placeholder:text-zinc-300 dark:focus:bg-zinc-800"
+                        />
+                        <motion.button
+                          type="button"
+                          onClick={handleCopy}
+                          whileHover={prefersReducedMotion ? {} : { scale: 1.04, y: -1 }}
+                          whileTap={prefersReducedMotion ? {} : { scale: 0.94, y: 1 }}
+                          transition={{
+                            type: "spring",
+                            stiffness: 420,
+                            damping: 24,
+                          }}
+                          className="inline-flex size-10 items-center justify-center rounded-ios-lg bg-blue-600 text-white shadow-sm shadow-blue-950/20 hover:bg-blue-500 dark:bg-blue-500 dark:hover:bg-blue-400"
+                          aria-label={copied ? "Color copied" : "Copy current color"}
+                          title={copied ? "Copied" : "Copy"}
+                        >
+                          <motion.span
+                            animate={prefersReducedMotion ? {} : { scale: copied ? 1.12 : 1 }}
+                            className="inline-flex"
+                          >
+                            {copied ? <Check size={16} /> : <Copy size={16} />}
+                          </motion.span>
+                        </motion.button>
+                      </div>
+                      {error && (
+                        <p
+                          id="color-input-error"
+                          role="alert"
+                          className="mt-1 text-xs text-red-600 dark:text-red-400"
+                        >
+                          {error}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <ColorHarmonies
+                    color={currentColor}
+                    onSelect={(color) => {
+                      setColor(color, "shade", settings.history.addGeneratedColors);
+                      setInputDraft(null);
+                      setError(null);
+                    }}
+                    onCopy={(value) => void copy(value)}
+                  />
+                </div>
+                {pickerError && (
+                  <p
+                    role="alert"
+                    className="rounded-ios-2xl bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950 dark:text-red-300"
+                  >
+                    {pickerError}
+                  </p>
+                )}
 
-        <ColorDetails
-          color={currentColor}
-          formatting={settings.formatting}
-          onChange={(color) => setColor(color, "manual-input")}
-          onCopy={(value, label) => void copy(value, label)}
-        />
-        <ColorHarmonies
-          color={currentColor}
-          onSelect={(color) => setColor(color, "shade", settings.history.addGeneratedColors)}
-          onCopy={(value) => void copy(value)}
-        />
-        <HistoryList
-          entries={history}
-          formatting={settings.formatting}
-          search={search}
-          favoritesOnly={favoritesOnly}
-          onSearch={setSearch}
-          onFavoritesOnly={setFavoritesOnly}
-          onSelect={(entry) => setColor(entry.rgba, entry.source, false)}
-          onCopy={(value) => void copy(value)}
-          onFavorite={toggleFavorite}
-          onDelete={deleteHistory}
-        />
-      </main>
+                <ColorDetails
+                  color={currentColor}
+                  formatting={settings.formatting}
+                  favorite={currentHistoryEntry?.favorite ?? false}
+                  onFavorite={toggleCurrentColorFavorite}
+                  onCopy={(value, label) => void copy(value, label)}
+                />
+              </>
+            ) : (
+              <HistoryList
+                entries={history}
+                formatting={settings.formatting}
+                favoritesOnly={favoritesOnly}
+                onFavoritesOnly={setFavoritesOnly}
+                onClearNonFavorites={() => clearHistory(true)}
+                onSelect={(entry) => {
+                  setColor(entry.rgba, entry.source, false);
+                  setInputDraft(null);
+                  setError(null);
+                  setActiveSection("picker");
+                }}
+                onCopy={(value) => void copy(value)}
+                onFavorite={toggleFavorite}
+                onDelete={deleteHistory}
+              />
+            )}
+          </main>
 
-      <footer className="sticky bottom-0 border-t border-zinc-200 bg-white/95 px-4 py-2 text-center text-xs text-zinc-500 backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/95">
-        {settings.picker.shortcutEnabled
-          ? `${settings.picker.shortcut} · Global shortcut active`
-          : "Global shortcut paused"}
-      </footer>
+          <footer className="relative z-10 bg-zinc-950/75 px-4 py-1.5 text-center text-[10px] text-zinc-300 backdrop-blur">
+            © {new Date().getFullYear()} NibWind
+          </footer>
+        </>
+      )}
       <Toast message={message} />
 
       {settingsOpen && (
@@ -165,7 +347,6 @@ export function App() {
             onClose={() => setSettingsOpen(false)}
             onSave={updateSettings}
             onImport={importHistory}
-            onClear={clearHistory}
           />
         </Suspense>
       )}

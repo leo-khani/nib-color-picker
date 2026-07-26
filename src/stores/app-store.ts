@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import type { HistoryEntry, HistorySource, RgbaColor } from "../types/color";
 import type { AppSettings } from "../types/settings";
-import { formatColor } from "../lib/color/color";
+import { formatColor, toHex } from "../lib/color/color";
 import { addHistoryEntry, createHistoryEntry } from "../features/color-history/history";
 import { createRepository } from "../lib/storage/repository";
 import { DEFAULT_DATA, DEFAULT_SETTINGS } from "../lib/storage/defaults";
@@ -19,16 +19,15 @@ interface AppStore {
   currentColor: RgbaColor;
   history: HistoryEntry[];
   settings: AppSettings;
-  search: string;
   favoritesOnly: boolean;
   hydrate: () => Promise<void>;
   setColor: (color: RgbaColor, source?: HistorySource, addToHistory?: boolean) => void;
   updateSettings: (settings: AppSettings) => Promise<void>;
+  toggleCurrentColorFavorite: () => void;
   toggleFavorite: (id: string) => void;
   deleteHistory: (id: string) => void;
   clearHistory: (preserveFavorites: boolean) => void;
   importHistory: (entries: HistoryEntry[]) => void;
-  setSearch: (search: string) => void;
   setFavoritesOnly: (favoritesOnly: boolean) => void;
 }
 
@@ -51,12 +50,12 @@ export const useAppStore = create<AppStore>((set, get) => ({
   currentColor: { r: 37, g: 99, b: 235, a: 1 },
   history: [],
   settings: DEFAULT_SETTINGS,
-  search: "",
   favoritesOnly: false,
   hydrate: async () => {
     const data = await repository.load();
     const settings = {
       ...data.settings,
+      appearance: { ...data.settings.appearance, theme: "dark" as const },
       general: { ...data.settings.general, alwaysOnTop: true },
     };
     const current = data.history[0]?.rgba ?? get().currentColor;
@@ -80,18 +79,14 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const previous = get().settings;
     const normalizedSettings = {
       ...settings,
+      appearance: { ...settings.appearance, theme: "dark" as const },
       general: { ...settings.general, alwaysOnTop: true },
     };
     try {
-      if (
-        normalizedSettings.picker.shortcut !== previous.picker.shortcut ||
-        normalizedSettings.picker.shortcutEnabled !== previous.picker.shortcutEnabled
-      ) {
-        await registerPickerShortcut(
-          normalizedSettings.picker.shortcut,
-          normalizedSettings.picker.shortcutEnabled,
-        );
-      }
+      await registerPickerShortcut(
+        normalizedSettings.picker.shortcut,
+        normalizedSettings.picker.shortcutEnabled,
+      );
       await applyWindowPreferences(true);
       if (normalizedSettings.general.launchAtStartup !== previous.general.launchAtStartup) {
         await setStartupEnabled(normalizedSettings.general.launchAtStartup);
@@ -104,6 +99,22 @@ export const useAppStore = create<AppStore>((set, get) => ({
         { cause: error },
       );
     }
+  },
+  toggleCurrentColorFavorite: () => {
+    const state = get();
+    const currentHex = toHex(state.currentColor);
+    const existing = state.history.find((entry) => entry.hex === currentHex);
+    const history = existing
+      ? state.history.map((entry) =>
+          entry.id === existing.id ? { ...entry, favorite: !entry.favorite } : entry,
+        )
+      : addHistoryEntry(
+          state.history,
+          createHistoryEntry(state.currentColor, "manual-input", { favorite: true }),
+          state.settings.history,
+        );
+    set({ history });
+    scheduleSave(get);
   },
   toggleFavorite: (id) => {
     set((state) => ({
@@ -131,7 +142,6 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set({ history });
     scheduleSave(get);
   },
-  setSearch: (search) => set({ search }),
   setFavoritesOnly: (favoritesOnly) => set({ favoritesOnly }),
 }));
 

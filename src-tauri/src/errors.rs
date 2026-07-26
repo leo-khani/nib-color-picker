@@ -7,6 +7,8 @@ pub enum AppError {
     PickerCancelled,
     #[error("Windows could not sample the selected screen pixel.")]
     ScreenCapture,
+    #[error("Windows could not create the color picker indicator.")]
+    PickerOverlay,
     #[error("The global shortcut could not be registered: {0}")]
     Shortcut(String),
     #[error("The application window is unavailable.")]

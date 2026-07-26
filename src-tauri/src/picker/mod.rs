@@ -19,52 +19,237 @@ pub struct PickerResult {
     y: i32,
 }
 
-#[cfg(target_os = "windows")]
-pub fn pick_screen_color() -> Result<PickerResult, AppError> {
-    use std::{thread, time::Duration};
-    use windows::Win32::{
-        Foundation::{COLORREF, POINT},
-        Graphics::Gdi::{GetDC, GetPixel, ReleaseDC, CLR_INVALID},
-        UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_ESCAPE, VK_LBUTTON, VK_RBUTTON},
-        UI::WindowsAndMessaging::GetCursorPos,
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ScreenBounds {
+    left: i32,
+    top: i32,
+    right: i32,
+    bottom: i32,
+}
+
+const INDICATOR_WIDTH: i32 = 154;
+const INDICATOR_HEIGHT: i32 = 42;
+const CURSOR_GAP: i32 = 18;
+
+fn indicator_position(cursor_x: i32, cursor_y: i32, bounds: ScreenBounds) -> (i32, i32) {
+    let preferred_x = cursor_x + CURSOR_GAP;
+    let preferred_y = cursor_y + CURSOR_GAP;
+    let x = if preferred_x + INDICATOR_WIDTH > bounds.right {
+        cursor_x - CURSOR_GAP - INDICATOR_WIDTH
+    } else {
+        preferred_x
+    };
+    let y = if preferred_y + INDICATOR_HEIGHT > bounds.bottom {
+        cursor_y - CURSOR_GAP - INDICATOR_HEIGHT
+    } else {
+        preferred_y
     };
 
-    let mut left_was_down = false;
-    loop {
-        let escape_down = unsafe { GetAsyncKeyState(VK_ESCAPE.0.into()) } < 0;
-        let right_down = unsafe { GetAsyncKeyState(VK_RBUTTON.0.into()) } < 0;
-        if escape_down || right_down {
-            return Err(AppError::PickerCancelled);
+    (
+        x.clamp(bounds.left, bounds.right - INDICATOR_WIDTH),
+        y.clamp(bounds.top, bounds.bottom - INDICATOR_HEIGHT),
+    )
+}
+
+#[cfg(target_os = "windows")]
+mod windows_picker {
+    use std::{thread, time::Duration};
+
+    use windows::{
+        core::w,
+        Win32::{
+            Foundation::{COLORREF, HWND, POINT, RECT},
+            Graphics::Gdi::{
+                CreateSolidBrush, DeleteObject, FillRect, FrameRect, GetDC, GetMonitorInfoW,
+                GetPixel, MonitorFromPoint, ReleaseDC, SetBkMode, SetTextColor, TextOutW,
+                CLR_INVALID, HGDIOBJ, MONITORINFO, MONITOR_DEFAULTTONEAREST, TRANSPARENT,
+            },
+            UI::{
+                Input::KeyboardAndMouse::{GetAsyncKeyState, VK_ESCAPE, VK_LBUTTON, VK_RBUTTON},
+                WindowsAndMessaging::{
+                    CreateWindowExW, DestroyWindow, GetCursorPos, SetWindowPos, HWND_TOPMOST,
+                    SWP_NOACTIVATE, SWP_SHOWWINDOW, WINDOW_EX_STYLE, WS_EX_NOACTIVATE,
+                    WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_TRANSPARENT, WS_POPUP,
+                },
+            },
+        },
+    };
+
+    use super::{
+        indicator_position, AppError, PickerResult, RgbaColor, ScreenBounds, INDICATOR_HEIGHT,
+        INDICATOR_WIDTH,
+    };
+
+    struct ColorIndicator {
+        window: HWND,
+    }
+
+    impl ColorIndicator {
+        fn create() -> Result<Self, AppError> {
+            let window = unsafe {
+                CreateWindowExW(
+                    WINDOW_EX_STYLE(
+                        WS_EX_TOOLWINDOW.0
+                            | WS_EX_TOPMOST.0
+                            | WS_EX_NOACTIVATE.0
+                            | WS_EX_TRANSPARENT.0,
+                    ),
+                    w!("STATIC"),
+                    w!(""),
+                    WS_POPUP,
+                    0,
+                    0,
+                    INDICATOR_WIDTH,
+                    INDICATOR_HEIGHT,
+                    None,
+                    None,
+                    None,
+                    None,
+                )
+            }
+            .map_err(|_| AppError::PickerOverlay)?;
+            Ok(Self { window })
         }
 
-        let left_down = unsafe { GetAsyncKeyState(VK_LBUTTON.0.into()) } < 0;
-        if left_down && !left_was_down {
+        fn update(&self, point: POINT, pixel: COLORREF) -> Result<(), AppError> {
+            let bounds = monitor_bounds(point)?;
+            let (x, y) = indicator_position(point.x, point.y, bounds);
+            unsafe {
+                SetWindowPos(
+                    self.window,
+                    Some(HWND_TOPMOST),
+                    x,
+                    y,
+                    INDICATOR_WIDTH,
+                    INDICATOR_HEIGHT,
+                    SWP_NOACTIVATE | SWP_SHOWWINDOW,
+                )
+            }
+            .map_err(|_| AppError::PickerOverlay)?;
+            draw_indicator(self.window, pixel)
+        }
+    }
+
+    impl Drop for ColorIndicator {
+        fn drop(&mut self) {
+            let _ = unsafe { DestroyWindow(self.window) };
+        }
+    }
+
+    fn monitor_bounds(point: POINT) -> Result<ScreenBounds, AppError> {
+        let monitor = unsafe { MonitorFromPoint(point, MONITOR_DEFAULTTONEAREST) };
+        let mut info = MONITORINFO {
+            cbSize: std::mem::size_of::<MONITORINFO>() as u32,
+            ..Default::default()
+        };
+        if !unsafe { GetMonitorInfoW(monitor, &mut info) }.as_bool() {
+            return Err(AppError::PickerOverlay);
+        }
+        Ok(ScreenBounds {
+            left: info.rcWork.left,
+            top: info.rcWork.top,
+            right: info.rcWork.right,
+            bottom: info.rcWork.bottom,
+        })
+    }
+
+    fn sample_pixel(point: POINT) -> Result<COLORREF, AppError> {
+        let dc = unsafe { GetDC(None) };
+        if dc.is_invalid() {
+            return Err(AppError::ScreenCapture);
+        }
+        let pixel = unsafe { GetPixel(dc, point.x, point.y) };
+        unsafe { ReleaseDC(None, dc) };
+        if pixel == COLORREF(CLR_INVALID) {
+            return Err(AppError::ScreenCapture);
+        }
+        Ok(pixel)
+    }
+
+    fn draw_indicator(window: HWND, pixel: COLORREF) -> Result<(), AppError> {
+        let dc = unsafe { GetDC(Some(window)) };
+        if dc.is_invalid() {
+            return Err(AppError::PickerOverlay);
+        }
+
+        let background = unsafe { CreateSolidBrush(COLORREF(0x00202020)) };
+        let border = unsafe { CreateSolidBrush(COLORREF(0x005A5A5A)) };
+        let swatch = unsafe { CreateSolidBrush(pixel) };
+        let outer = RECT {
+            left: 0,
+            top: 0,
+            right: INDICATOR_WIDTH,
+            bottom: INDICATOR_HEIGHT,
+        };
+        let swatch_rect = RECT {
+            left: 7,
+            top: 7,
+            right: 35,
+            bottom: 35,
+        };
+
+        unsafe {
+            FillRect(dc, &outer, background);
+            FrameRect(dc, &outer, border);
+            FillRect(dc, &swatch_rect, swatch);
+            FrameRect(dc, &swatch_rect, border);
+            SetBkMode(dc, TRANSPARENT);
+            SetTextColor(dc, COLORREF(0x00FFFFFF));
+        }
+
+        let red = pixel.0 & 0xff;
+        let green = (pixel.0 >> 8) & 0xff;
+        let blue = (pixel.0 >> 16) & 0xff;
+        let label: Vec<u16> = format!("#{red:02X}{green:02X}{blue:02X}")
+            .encode_utf16()
+            .collect();
+        unsafe {
+            let _ = TextOutW(dc, 45, 13, &label);
+            let _ = DeleteObject(HGDIOBJ(background.0));
+            let _ = DeleteObject(HGDIOBJ(border.0));
+            let _ = DeleteObject(HGDIOBJ(swatch.0));
+            ReleaseDC(Some(window), dc);
+        }
+        Ok(())
+    }
+
+    pub fn pick_screen_color() -> Result<PickerResult, AppError> {
+        let indicator = ColorIndicator::create()?;
+        let mut left_was_down = unsafe { GetAsyncKeyState(VK_LBUTTON.0.into()) } < 0;
+
+        loop {
+            let escape_down = unsafe { GetAsyncKeyState(VK_ESCAPE.0.into()) } < 0;
+            let right_down = unsafe { GetAsyncKeyState(VK_RBUTTON.0.into()) } < 0;
+            if escape_down || right_down {
+                return Err(AppError::PickerCancelled);
+            }
+
             let mut point = POINT::default();
             unsafe { GetCursorPos(&mut point) }.map_err(|_| AppError::ScreenCapture)?;
-            let dc = unsafe { GetDC(None) };
-            if dc.is_invalid() {
-                return Err(AppError::ScreenCapture);
+            let pixel = sample_pixel(point)?;
+            indicator.update(point, pixel)?;
+
+            let left_down = unsafe { GetAsyncKeyState(VK_LBUTTON.0.into()) } < 0;
+            if left_down && !left_was_down {
+                return Ok(PickerResult {
+                    color: RgbaColor {
+                        r: (pixel.0 & 0xff) as u8,
+                        g: ((pixel.0 >> 8) & 0xff) as u8,
+                        b: ((pixel.0 >> 16) & 0xff) as u8,
+                        a: 1.0,
+                    },
+                    x: point.x,
+                    y: point.y,
+                });
             }
-            let pixel = unsafe { GetPixel(dc, point.x, point.y) };
-            unsafe { ReleaseDC(None, dc) };
-            if pixel == COLORREF(CLR_INVALID) {
-                return Err(AppError::ScreenCapture);
-            }
-            return Ok(PickerResult {
-                color: RgbaColor {
-                    r: (pixel.0 & 0xff) as u8,
-                    g: ((pixel.0 >> 8) & 0xff) as u8,
-                    b: ((pixel.0 >> 16) & 0xff) as u8,
-                    a: 1.0,
-                },
-                x: point.x,
-                y: point.y,
-            });
+            left_was_down = left_down;
+            thread::sleep(Duration::from_millis(16));
         }
-        left_was_down = left_down;
-        thread::sleep(Duration::from_millis(8));
     }
 }
+
+#[cfg(target_os = "windows")]
+pub use windows_picker::pick_screen_color;
 
 #[cfg(not(target_os = "windows"))]
 pub fn pick_screen_color() -> Result<PickerResult, AppError> {
@@ -90,5 +275,29 @@ mod tests {
         let value = serde_json::to_value(result).expect("picker result should serialize");
         assert_eq!(value["color"]["r"], 1);
         assert_eq!(value["x"], -100);
+    }
+
+    #[test]
+    fn indicator_flips_inside_monitor_edges() {
+        let bounds = ScreenBounds {
+            left: -1920,
+            top: 0,
+            right: 0,
+            bottom: 1080,
+        };
+        assert_eq!(indicator_position(-1000, 500, bounds), (-982, 518));
+        assert_eq!(indicator_position(-10, 1070, bounds), (-182, 1010));
+    }
+
+    #[test]
+    fn indicator_clamps_to_small_monitor_bounds() {
+        let bounds = ScreenBounds {
+            left: 0,
+            top: 0,
+            right: 200,
+            bottom: 100,
+        };
+        assert_eq!(indicator_position(5, 5, bounds), (23, 23));
+        assert_eq!(indicator_position(195, 95, bounds), (23, 35));
     }
 }
