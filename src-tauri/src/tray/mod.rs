@@ -31,8 +31,12 @@ pub fn create(app: &App) -> tauri::Result<()> {
         ],
     )?;
 
-    TrayIconBuilder::new()
-        .tooltip("Nib Color Picker")
+    let mut tray = TrayIconBuilder::new();
+    if let Some(icon) = app.default_window_icon() {
+        tray = tray.icon(icon.clone());
+    }
+
+    tray.tooltip("Nib Color Picker")
         .menu(&menu)
         .on_menu_event(|app, event| match event.id.as_ref() {
             "open" => {

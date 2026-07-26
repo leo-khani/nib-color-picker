@@ -8,7 +8,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     startMinimized: false,
     minimizeToTray: true,
     closeToTray: true,
-    alwaysOnTop: false,
+    alwaysOnTop: true,
     restoreAfterPicking: true,
     showNotifications: true,
     confirmDestructiveActions: true,

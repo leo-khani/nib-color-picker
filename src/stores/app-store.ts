@@ -55,13 +55,18 @@ export const useAppStore = create<AppStore>((set, get) => ({
   favoritesOnly: false,
   hydrate: async () => {
     const data = await repository.load();
+    const settings = {
+      ...data.settings,
+      general: { ...data.settings.general, alwaysOnTop: true },
+    };
     const current = data.history[0]?.rgba ?? get().currentColor;
-    set({ hydrated: true, history: data.history, settings: data.settings, currentColor: current });
+    set({ hydrated: true, history: data.history, settings, currentColor: current });
     await Promise.allSettled([
-      applyWindowPreferences(data.settings.general.alwaysOnTop),
-      registerPickerShortcut(data.settings.picker.shortcut, data.settings.picker.shortcutEnabled),
-      setStartupEnabled(data.settings.general.launchAtStartup),
+      applyWindowPreferences(true),
+      registerPickerShortcut(settings.picker.shortcut, settings.picker.shortcutEnabled),
+      setStartupEnabled(settings.general.launchAtStartup),
     ]);
+    scheduleSave(get);
   },
   setColor: (color, source = "manual-input", shouldAdd = true) => {
     const settings = get().settings;
@@ -73,20 +78,25 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
   updateSettings: async (settings) => {
     const previous = get().settings;
+    const normalizedSettings = {
+      ...settings,
+      general: { ...settings.general, alwaysOnTop: true },
+    };
     try {
       if (
-        settings.picker.shortcut !== previous.picker.shortcut ||
-        settings.picker.shortcutEnabled !== previous.picker.shortcutEnabled
+        normalizedSettings.picker.shortcut !== previous.picker.shortcut ||
+        normalizedSettings.picker.shortcutEnabled !== previous.picker.shortcutEnabled
       ) {
-        await registerPickerShortcut(settings.picker.shortcut, settings.picker.shortcutEnabled);
+        await registerPickerShortcut(
+          normalizedSettings.picker.shortcut,
+          normalizedSettings.picker.shortcutEnabled,
+        );
       }
-      if (settings.general.alwaysOnTop !== previous.general.alwaysOnTop) {
-        await applyWindowPreferences(settings.general.alwaysOnTop);
+      await applyWindowPreferences(true);
+      if (normalizedSettings.general.launchAtStartup !== previous.general.launchAtStartup) {
+        await setStartupEnabled(normalizedSettings.general.launchAtStartup);
       }
-      if (settings.general.launchAtStartup !== previous.general.launchAtStartup) {
-        await setStartupEnabled(settings.general.launchAtStartup);
-      }
-      set({ settings });
+      set({ settings: normalizedSettings });
       scheduleSave(get);
     } catch (error) {
       throw new Error(
