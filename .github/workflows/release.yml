@@ -39,7 +39,7 @@ jobs:
             Where-Object Extension -in '.msi', '.exe' |
             ForEach-Object { Get-FileHash $_.FullName -Algorithm SHA256 } |
             Format-Table -AutoSize | Out-File checksums.txt
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           files: checksums.txt
           draft: true
