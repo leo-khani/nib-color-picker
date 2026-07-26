@@ -4,6 +4,8 @@ All notable changes are documented here. This project follows Semantic Versionin
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-07-26
+
 ### Added
 
 - Native Windows pixel picker, tray lifecycle, global shortcut, startup integration,
@@ -11,23 +13,22 @@ All notable changes are documented here. This project follows Semantic Versionin
 - Typed color conversion, contrast, palette, history, import/export, and storage logic.
 - Accessible React application shell with local settings and history.
 - Windows validation and tagged release workflows.
+- Compact always-on-top mode, a pointer-adjacent HEX indicator, and custom Windows,
+  tray, installer, and web icons.
 
 ### Changed
 
-- Apply the Dr. White, Kettle Black, Free Speech Blue, and Vivid Cerulean palette
-  throughout the light and dark application themes.
+- Apply the accessible Obsidian Iris palette and locally bundled Sen typeface
+  throughout the dark-only interface.
 - Turn compact mode into a focused color, code, and Pick layout and automatically
   resize the desktop window to the visible content.
-- Add a subtle, slowly animated blue ambient background that respects reduced-motion
-  preferences in both light and dark themes.
+- Add a subtle animated Grainient background that respects reduced-motion preferences.
 - Keep Settings available from compact mode, make current-color favorites functional,
   remove rotational UI motion, animate history cards with FadeBlur, replace history
   search with a clear-non-favorites action, and simplify Settings around a dark-only
   theme with direct shortcut capture.
-- Replace the CSS ambient gradient with an adapted React Bits Grainient WebGL
-  background using the Nib palette, reduced motion, and zero rotational movement.
-- Generate the Windows executable, installer, window, tray, and web icons from the
-  new Nib icon artwork.
+- Add a reusable frosted glass surface with blur, restrained distortion, and subtle
+  noise.
 
 ### Fixed
 
@@ -42,3 +43,8 @@ All notable changes are documented here. This project follows Semantic Versionin
   window does not continue growing as colors are added.
 - Center the native picker HEX indicator beneath the cursor and give its compact,
   content-fitted color preview and label a fully rounded pill layout.
+- Keep format rows aligned inside glass surfaces and select black or white overlay
+  icons according to the underlying color contrast.
+
+[Unreleased]: https://github.com/leo-khani/nib-color-picker/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/leo-khani/nib-color-picker/releases/tag/v0.1.0
