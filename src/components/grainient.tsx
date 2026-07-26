@@ -168,9 +168,9 @@ export function Grainient({
   gamma = 1,
   saturation = 0.72,
   zoom = 0.82,
-  color1 = "#44A7EC",
-  color2 = "#335AC7",
-  color3 = "#131315",
+  color1 = "#2B2745",
+  color2 = "#1B192A",
+  color3 = "#0D0D12",
 }: GrainientProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -298,7 +298,7 @@ export function Grainient({
   return (
     <div
       ref={containerRef}
-      className={`grainient-container ${className}`.trim()}
+      className={`grainient-container opacity-60 ${className}`.trim()}
       aria-hidden="true"
     />
   );

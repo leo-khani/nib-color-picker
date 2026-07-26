@@ -32,8 +32,11 @@ export function HistoryList({
   const hasNonFavorites = entries.some((entry) => !entry.favorite);
 
   return (
-    <section aria-labelledby="history-title">
-      <div className="mb-3 flex items-center justify-between">
+    <section
+      aria-labelledby="history-title"
+      className="flex min-h-0 max-h-[26rem] flex-col overflow-hidden"
+    >
+      <div className="mb-3 flex shrink-0 items-center justify-between">
         <h2 id="history-title" className="text-sm font-semibold">
           Recent colors
         </h2>
@@ -61,7 +64,7 @@ export function HistoryList({
           {entries.length === 0 ? "Picked colors will appear here." : "No favorite colors yet."}
         </div>
       ) : (
-        <ul className="space-y-1">
+        <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain pr-1">
           {visible.map((entry, index) => {
             const preferred = formatColor(entry.rgba, formatting)[formatting.preferredFormat];
             return (
@@ -71,7 +74,7 @@ export function HistoryList({
                   delay={Math.min(index * 0.035, 0.28)}
                   y={12}
                   blur={8}
-                  className="group flex items-center gap-2 rounded-ios-xl bg-zinc-900/70 px-2 py-2 hover:bg-zinc-800"
+                  className="group flex items-center gap-2 rounded-ios-xl bg-zinc-900/70 px-2 py-2 hover:bg-zinc-900 duration-200"
                 >
                   <button
                     type="button"

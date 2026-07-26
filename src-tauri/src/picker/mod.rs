@@ -27,18 +27,13 @@ struct ScreenBounds {
     bottom: i32,
 }
 
-const INDICATOR_WIDTH: i32 = 154;
-const INDICATOR_HEIGHT: i32 = 42;
-const CURSOR_GAP: i32 = 18;
+const INDICATOR_WIDTH: i32 = 106;
+const INDICATOR_HEIGHT: i32 = 36;
+const CURSOR_GAP: i32 = 14;
 
 fn indicator_position(cursor_x: i32, cursor_y: i32, bounds: ScreenBounds) -> (i32, i32) {
-    let preferred_x = cursor_x + CURSOR_GAP;
+    let preferred_x = cursor_x - INDICATOR_WIDTH / 2;
     let preferred_y = cursor_y + CURSOR_GAP;
-    let x = if preferred_x + INDICATOR_WIDTH > bounds.right {
-        cursor_x - CURSOR_GAP - INDICATOR_WIDTH
-    } else {
-        preferred_x
-    };
     let y = if preferred_y + INDICATOR_HEIGHT > bounds.bottom {
         cursor_y - CURSOR_GAP - INDICATOR_HEIGHT
     } else {
@@ -46,7 +41,7 @@ fn indicator_position(cursor_x: i32, cursor_y: i32, bounds: ScreenBounds) -> (i3
     };
 
     (
-        x.clamp(bounds.left, bounds.right - INDICATOR_WIDTH),
+        preferred_x.clamp(bounds.left, bounds.right - INDICATOR_WIDTH),
         y.clamp(bounds.top, bounds.bottom - INDICATOR_HEIGHT),
     )
 }
@@ -60,9 +55,10 @@ mod windows_picker {
         Win32::{
             Foundation::{COLORREF, HWND, POINT, RECT},
             Graphics::Gdi::{
-                CreateSolidBrush, DeleteObject, FillRect, FrameRect, GetDC, GetMonitorInfoW,
-                GetPixel, MonitorFromPoint, ReleaseDC, SetBkMode, SetTextColor, TextOutW,
-                CLR_INVALID, HGDIOBJ, MONITORINFO, MONITOR_DEFAULTTONEAREST, TRANSPARENT,
+                CreateRoundRectRgn, CreateSolidBrush, DeleteObject, DrawTextW, FillRgn, GetDC,
+                GetMonitorInfoW, GetPixel, MonitorFromPoint, ReleaseDC, SetBkMode, SetTextColor,
+                SetWindowRgn, CLR_INVALID, DT_CENTER, DT_SINGLELINE, DT_VCENTER, HGDIOBJ,
+                MONITORINFO, MONITOR_DEFAULTTONEAREST, TRANSPARENT,
             },
             UI::{
                 Input::KeyboardAndMouse::{GetAsyncKeyState, VK_ESCAPE, VK_LBUTTON, VK_RBUTTON},
@@ -108,6 +104,14 @@ mod windows_picker {
                 )
             }
             .map_err(|_| AppError::PickerOverlay)?;
+            let region = unsafe {
+                CreateRoundRectRgn(0, 0, INDICATOR_WIDTH + 1, INDICATOR_HEIGHT + 1, 24, 24)
+            };
+            if unsafe { SetWindowRgn(window, Some(region), true) } == 0 {
+                let _ = unsafe { DeleteObject(HGDIOBJ(region.0)) };
+                let _ = unsafe { DestroyWindow(window) };
+                return Err(AppError::PickerOverlay);
+            }
             Ok(Self { window })
         }
 
@@ -172,27 +176,15 @@ mod windows_picker {
             return Err(AppError::PickerOverlay);
         }
 
-        let background = unsafe { CreateSolidBrush(COLORREF(0x00202020)) };
-        let border = unsafe { CreateSolidBrush(COLORREF(0x005A5A5A)) };
+        let background = unsafe { CreateSolidBrush(COLORREF(0x00151313)) };
         let swatch = unsafe { CreateSolidBrush(pixel) };
-        let outer = RECT {
-            left: 0,
-            top: 0,
-            right: INDICATOR_WIDTH,
-            bottom: INDICATOR_HEIGHT,
-        };
-        let swatch_rect = RECT {
-            left: 7,
-            top: 7,
-            right: 35,
-            bottom: 35,
-        };
+        let outer_shape =
+            unsafe { CreateRoundRectRgn(0, 0, INDICATOR_WIDTH + 1, INDICATOR_HEIGHT + 1, 24, 24) };
+        let swatch_shape = unsafe { CreateRoundRectRgn(7, 7, 29, 29, 9, 9) };
 
         unsafe {
-            FillRect(dc, &outer, background);
-            FrameRect(dc, &outer, border);
-            FillRect(dc, &swatch_rect, swatch);
-            FrameRect(dc, &swatch_rect, border);
+            let _ = FillRgn(dc, outer_shape, background);
+            let _ = FillRgn(dc, swatch_shape, swatch);
             SetBkMode(dc, TRANSPARENT);
             SetTextColor(dc, COLORREF(0x00FFFFFF));
         }
@@ -200,13 +192,25 @@ mod windows_picker {
         let red = pixel.0 & 0xff;
         let green = (pixel.0 >> 8) & 0xff;
         let blue = (pixel.0 >> 16) & 0xff;
-        let label: Vec<u16> = format!("#{red:02X}{green:02X}{blue:02X}")
+        let mut label: Vec<u16> = format!("#{red:02X}{green:02X}{blue:02X}")
             .encode_utf16()
             .collect();
+        let mut text_rect = RECT {
+            left: 34,
+            top: 0,
+            right: INDICATOR_WIDTH - 5,
+            bottom: INDICATOR_HEIGHT,
+        };
         unsafe {
-            let _ = TextOutW(dc, 45, 13, &label);
+            let _ = DrawTextW(
+                dc,
+                &mut label,
+                &mut text_rect,
+                DT_CENTER | DT_VCENTER | DT_SINGLELINE,
+            );
+            let _ = DeleteObject(HGDIOBJ(outer_shape.0));
+            let _ = DeleteObject(HGDIOBJ(swatch_shape.0));
             let _ = DeleteObject(HGDIOBJ(background.0));
-            let _ = DeleteObject(HGDIOBJ(border.0));
             let _ = DeleteObject(HGDIOBJ(swatch.0));
             ReleaseDC(Some(window), dc);
         }
@@ -285,8 +289,8 @@ mod tests {
             right: 0,
             bottom: 1080,
         };
-        assert_eq!(indicator_position(-1000, 500, bounds), (-982, 518));
-        assert_eq!(indicator_position(-10, 1070, bounds), (-182, 1010));
+        assert_eq!(indicator_position(-1000, 500, bounds), (-1053, 514));
+        assert_eq!(indicator_position(-10, 1070, bounds), (-106, 1020));
     }
 
     #[test]
@@ -297,7 +301,7 @@ mod tests {
             right: 200,
             bottom: 100,
         };
-        assert_eq!(indicator_position(5, 5, bounds), (23, 23));
-        assert_eq!(indicator_position(195, 95, bounds), (23, 35));
+        assert_eq!(indicator_position(5, 5, bounds), (0, 19));
+        assert_eq!(indicator_position(195, 95, bounds), (94, 45));
     }
 }

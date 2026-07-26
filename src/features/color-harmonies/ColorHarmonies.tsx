@@ -2,7 +2,7 @@ import { Copy } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { useMemo } from "react";
 import type { RgbaColor } from "../../types/color";
-import { toHex } from "../../lib/color/color";
+import { readableTextColor, toHex } from "../../lib/color/color";
 import { generateLightnessScale } from "../../lib/color/harmonies";
 import { FadeBlur } from "../../components/fade-blur";
 
@@ -28,6 +28,7 @@ export function ColorHarmonies({ color, onSelect, onCopy }: ColorHarmoniesProps)
             <div className="flex items-center justify-between gap-2 max-w-full">
               {group.colors.map((swatch, index) => {
                 const hex = toHex(swatch);
+                const iconColor = readableTextColor(swatch);
 
                 return (
                   <FadeBlur key={`${hex}-${index}`} delay={index * 0.05} className="w-full">
@@ -40,7 +41,7 @@ export function ColorHarmonies({ color, onSelect, onCopy }: ColorHarmoniesProps)
                         stiffness: 500,
                         damping: 25,
                       }}
-                      className="group relative block h-12 w-full overflow-hidden rounded-ios-2xl focus:z-10"
+                      className="group relative block h-8 w-full overflow-hidden rounded-ios-2xl focus:z-10"
                       style={{ backgroundColor: hex }}
                       aria-label={`Select ${hex}`}
                       title={hex}
@@ -52,7 +53,8 @@ export function ColorHarmonies({ color, onSelect, onCopy }: ColorHarmoniesProps)
                     >
                       <Copy
                         size={16}
-                        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-white opacity-0 drop-shadow-md transition-opacity group-hover:opacity-100"
+                        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 drop-shadow-md transition-opacity group-hover:opacity-100"
+                        style={{ color: iconColor }}
                       />
                     </motion.button>
                   </FadeBlur>

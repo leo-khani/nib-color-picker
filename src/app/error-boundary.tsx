@@ -24,7 +24,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       return (
         <main className="flex min-h-screen flex-col items-center justify-center gap-3 p-6 text-center">
           <h1 className="text-lg font-semibold">Nib Color Picker needs to restart</h1>
-          <p className="max-w-sm text-sm text-zinc-500">
+          <p className="max-w-sm text-sm text-zinc-400">
             Your colors remain stored locally. Close and reopen the application to continue.
           </p>
         </main>

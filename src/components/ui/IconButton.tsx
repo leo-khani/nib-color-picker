@@ -23,10 +23,10 @@ export function IconButton({
       title={label}
       initial={false}
       animate={{
-        scale: active ? 1.04 : 1,
+        scale: active ? 1.0 : 1,
       }}
       whileHover={{
-        scale: 1.06,
+        scale: 1.01,
         y: -1,
       }}
       whileTap={{
@@ -38,7 +38,7 @@ export function IconButton({
         stiffness: 420,
         damping: 22,
       }}
-      className={`inline-flex size-9 items-center justify-center rounded-ios-sm ${
+      className={`inline-flex size-9 items-center justify-center rounded-ios-sm cursor-pointer ${
         active
           ? "bg-blue-100 text-blue-700 shadow-sm dark:bg-blue-500/20 dark:text-blue-200"
           : "bg-zinc-200 text-zinc-700 hover:bg-zinc-300 hover:text-zinc-950 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700 dark:hover:text-white"
@@ -48,7 +48,7 @@ export function IconButton({
       <motion.span
         className="inline-flex items-center justify-center"
         animate={{
-          scale: active ? 1.08 : 1,
+          scale: active ? 1.03 : 1,
         }}
         whileHover={{
           scale: 1.1,

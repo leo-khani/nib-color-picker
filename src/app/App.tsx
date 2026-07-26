@@ -5,6 +5,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import AppHeaderBar, { type AppSection } from "../components/app-header-bar";
 import { Toast } from "../components/feedback/Toast";
 import { Grainient } from "../components/grainient";
+import { WindowTitleBar } from "../components/window-title-bar";
 import { ColorDetails } from "../features/color-details/ColorDetails";
 import { ColorHarmonies } from "../features/color-harmonies/ColorHarmonies";
 import { HistoryList } from "../features/color-history/HistoryList";
@@ -26,13 +27,15 @@ export function App() {
     hydrate,
     setColor,
     updateSettings,
-    toggleCurrentColorFavorite,
     toggleFavorite,
     deleteHistory,
     clearHistory,
     importHistory,
     setFavoritesOnly,
   } = useAppStore();
+  const toggleCurrentColorFavorite = useAppStore(
+    (state): (() => void) => state.toggleCurrentColorFavorite,
+  );
   const { copy, message } = useCopy();
   const formats = useMemo(
     () => formatColor(currentColor, settings.formatting),
@@ -91,9 +94,9 @@ export function App() {
         const formats = formatColor(result.color, settings.formatting);
         await copy(formats[settings.formatting.preferredFormat], "Picked color copied");
       }
-    } catch (error) {
+    } catch (error: unknown) {
       const value = error instanceof Error ? error.message : String(error);
-      if (!value.toLowerCase().includes("cancel")) setPickerError(value);
+      if (!value.toLowerCase().includes("cancel")) setPickerError(value ?? null);
     } finally {
       setPicking(false);
     }
@@ -136,7 +139,7 @@ export function App() {
   if (!hydrated) {
     return (
       <div
-        className="relative isolate flex min-h-screen items-center justify-center overflow-hidden bg-nib-black"
+        className="relative isolate flex min-h-screen flex-col overflow-hidden rounded-ios-xl bg-nib-black"
         role="status"
         aria-label="Loading Nib Color Picker"
       >
@@ -144,8 +147,11 @@ export function App() {
           animate={!prefersReducedMotion}
           className="pointer-events-none absolute inset-0 z-0"
         />
-        <div className="spinner relative z-10" aria-hidden="true">
-          <div className="spinnerin" />
+        <WindowTitleBar />
+        <div className="relative z-10 flex flex-1 items-center justify-center">
+          <div className="spinner" aria-hidden="true">
+            <div className="spinnerin" />
+          </div>
         </div>
       </div>
     );
@@ -154,12 +160,13 @@ export function App() {
   return (
     <div
       ref={contentRef}
-      className="relative isolate flex flex-col overflow-hidden bg-nib-black text-zinc-50"
+      className="relative isolate flex flex-col overflow-hidden rounded-ios-xl bg-nib-black text-zinc-50"
     >
       <Grainient
         animate={!prefersReducedMotion}
         className="pointer-events-none absolute inset-0 z-0"
       />
+      <WindowTitleBar />
       {compact && !settingsOpen ? (
         <>
           <div className="relative z-20">
@@ -182,7 +189,7 @@ export function App() {
               type="button"
               onClick={handleCopy}
               whileTap={prefersReducedMotion ? {} : { scale: 0.97 }}
-              className="h-11 min-w-0 flex-1 truncate rounded-ios-xl bg-zinc-900/80 px-3 text-left font-mono text-sm uppercase"
+              className="h-11 min-w-0 flex-1 cursor-pointer truncate rounded-ios-xl bg-zinc-900/80 px-3 text-left font-mono text-sm uppercase"
               aria-label="Copy current color"
               title="Copy current color"
             >
@@ -194,7 +201,7 @@ export function App() {
               disabled={picking}
               whileHover={prefersReducedMotion ? {} : { scale: 1.03 }}
               whileTap={prefersReducedMotion ? {} : { scale: 0.96 }}
-              className="flex h-11 shrink-0 items-center gap-1.5 rounded-ios-xl bg-blue-500 px-3 text-sm font-semibold text-white shadow-sm shadow-blue-950/20 hover:bg-blue-400 disabled:opacity-60"
+              className="flex h-11 cursor-pointer shrink-0 items-center gap-1.5 rounded-ios-xl bg-blue-500 px-3 text-sm font-semibold text-zinc-950 shadow-sm shadow-blue-950/20 hover:bg-blue-400 disabled:opacity-60"
             >
               <Crosshair size={16} />
               {picking ? "Picking…" : "Pick"}
@@ -214,7 +221,7 @@ export function App() {
           <main className="relative z-10 mx-auto w-full max-w-sm flex-1 space-y-3 p-3">
             {activeSection === "picker" ? (
               <>
-                <div className="flex items-end gap-3">
+                <div className="flex items-center justify-between gap-3">
                   <motion.button
                     type="button"
                     onClick={() => void pick()}
@@ -222,11 +229,11 @@ export function App() {
                     whileHover={prefersReducedMotion ? {} : { scale: 1.03 }}
                     whileTap={prefersReducedMotion ? {} : { scale: 0.96 }}
                     transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                    className="flex h-9 shrink-0 items-center gap-2 rounded-ios-lg bg-blue-600 px-3 text-sm font-semibold text-white shadow-sm shadow-blue-950/20 hover:bg-blue-500 disabled:opacity-60 dark:bg-blue-500 dark:hover:bg-blue-400"
+                    className="flex h-9 shrink-0 items-center gap-2 rounded-ios-lg bg-blue-600 px-3 text-sm font-semibold text-zinc-950 shadow-sm shadow-blue-950/20 hover:bg-blue-500 disabled:opacity-60 dark:bg-blue-500 dark:hover:bg-blue-400"
                   >
                     <Crosshair size={16} />
                     {picking ? "Picking…" : "Pick"}
-                    <kbd className="rounded-ios-sm bg-white/15 px-1.5 py-0.5 font-mono text-[9px] font-normal tracking-tight">
+                    <kbd className="rounded-ios-sm cursor-pointer bg-white/15 px-1.5 py-0.5 font-mono text-[9px] font-normal tracking-tight">
                       {settings.picker.shortcut}
                     </kbd>
                   </motion.button>
@@ -260,7 +267,7 @@ export function App() {
                             stiffness: 420,
                             damping: 24,
                           }}
-                          className="inline-flex size-10 items-center justify-center rounded-ios-lg bg-blue-600 text-white shadow-sm shadow-blue-950/20 hover:bg-blue-500 dark:bg-blue-500 dark:hover:bg-blue-400"
+                          className="inline-flex cursor-pointer size-10 items-center justify-center rounded-ios-lg bg-blue-600 text-zinc-950 shadow-sm shadow-blue-950/20 hover:bg-blue-500 dark:bg-blue-500 dark:hover:bg-blue-400"
                           aria-label={copied ? "Color copied" : "Copy current color"}
                           title={copied ? "Copied" : "Copy"}
                         >
@@ -284,6 +291,7 @@ export function App() {
                     </div>
                   </div>
                 </div>
+
                 <div className="min-w-0 flex-1">
                   <ColorHarmonies
                     color={currentColor}
@@ -331,10 +339,6 @@ export function App() {
               />
             )}
           </main>
-
-          <footer className="relative z-10 bg-zinc-950/75 px-4 py-1.5 text-center text-[10px] text-zinc-300 backdrop-blur">
-            © {new Date().getFullYear()} NibWind
-          </footer>
         </>
       )}
       <Toast message={message} />

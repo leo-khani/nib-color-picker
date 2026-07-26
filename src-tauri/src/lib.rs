@@ -41,6 +41,37 @@ pub fn run() {
             commands::set_picker_shortcut
         ])
         .setup(|app| {
+            if let (Some(window), Some(icon)) =
+                (app.get_webview_window("main"), app.default_window_icon())
+            {
+                window.set_icon(icon.clone())?;
+
+                #[cfg(target_os = "windows")]
+                if let Ok(hwnd) = window.hwnd() {
+                    use std::ffi::c_void;
+                    use std::mem::size_of;
+                    use windows::Win32::Graphics::Dwm::{
+                        DwmSetWindowAttribute, DWMWA_BORDER_COLOR, DWMWA_WINDOW_CORNER_PREFERENCE,
+                        DWMWCP_DONOTROUND,
+                    };
+
+                    const DWM_COLOR_NONE: u32 = 0xFFFF_FFFE;
+                    unsafe {
+                        let _ = DwmSetWindowAttribute(
+                            hwnd,
+                            DWMWA_BORDER_COLOR,
+                            &DWM_COLOR_NONE as *const u32 as *const c_void,
+                            size_of::<u32>() as u32,
+                        );
+                        let _ = DwmSetWindowAttribute(
+                            hwnd,
+                            DWMWA_WINDOW_CORNER_PREFERENCE,
+                            &DWMWCP_DONOTROUND as *const _ as *const c_void,
+                            size_of_val(&DWMWCP_DONOTROUND) as u32,
+                        );
+                    }
+                }
+            }
             tray::create(app)?;
             let shortcut = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyC);
             if app.global_shortcut().register(shortcut).is_ok() {
