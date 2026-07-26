@@ -16,3 +16,4 @@ All notable changes are documented here. This project follows Semantic Versionin
 
 - Keep the main window above other applications and show the application icon in the
   Windows notification area instead of an empty tray slot.
+- Disable resizing and maximizing while continuing to restore the last window position.
